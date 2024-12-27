@@ -81,6 +81,8 @@ def update_features():
     global current_index
     course = course_names[current_index]
     selected_features = [key for key, var in feature_vars.items() if var.get()]
+
+    # 將選中的特徵應用到所有同名課程
     data.loc[data['科目名稱(連結課程地圖)             備註 \n             限選條件'] == course, selected_features] = True
 
     # 清空勾選
