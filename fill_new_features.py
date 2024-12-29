@@ -93,8 +93,12 @@ feature_frame.pack(pady=10)
 feature_label = tk.Label(feature_frame, text="選擇相關特徵:")
 feature_label.grid(row=0, column=0, columnspan=2)
 
+# 將特徵分為兩列顯示
+columns = 2
 for i, feature in enumerate(keywords.keys()):
-    tk.Checkbutton(feature_frame, text=feature, variable=feature_vars[feature]).grid(row=i + 1, column=0, sticky=tk.W)
+    column = i % columns
+    row = i // columns + 1
+    tk.Checkbutton(feature_frame, text=feature, variable=feature_vars[feature]).grid(row=row, column=column, sticky=tk.W, padx=10)
 
 # 更新特徵的函數
 def update_features():
