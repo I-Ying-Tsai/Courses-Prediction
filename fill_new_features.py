@@ -43,13 +43,20 @@ keywords = {
     '測量_遙感探測': ['遙感探測'],
     '測量_空間資訊': ['空間資訊'],
     '測量_攝影測量': ['攝影測量'],
+    '統計_迴歸分析': ['迴歸分析'],
+    '統計_抽樣方法': ['抽樣方法'],
+    '統計_多變量分析': ['多變量分析'],
+    '統計_類別資料分析': ['類別資料分析'],
+    '統計_工業應用': ['工業應用'],
+    '統計_統計推論': ['統計推論'],
     '跨領域': ['跨領域']
 }
 
 # 初始化新特徵
 def initialize_features(data, keywords):
     for feature in keywords.keys():
-        data[feature] = False
+        if feature not in data.columns:
+            data[feature] = False
     return data
 
 data = initialize_features(data, keywords)
@@ -61,12 +68,10 @@ progress_file = 'progress.json'
 if os.path.exists(progress_file):
     with open(progress_file, 'r') as f:
         progress = json.load(f)
-        completed_courses = set(progress.get('completed_courses', []))
 else:
-    completed_courses = set()
+    progress = {}
 
 course_names = data['科目名稱(連結課程地圖)             備註 \n             限選條件'].drop_duplicates().tolist()
-remaining_courses = [course for course in course_names if course not in completed_courses]
 
 # 建立 GUI
 root = tk.Tk()
@@ -82,12 +87,6 @@ dropdown_label.pack(pady=10)
 
 dropdown_menu = ttk.Combobox(root, textvariable=selected_course, values=course_names, state="readonly", width=50)
 dropdown_menu.pack(pady=10)
-
-# 標記已完成課程的樣式
-completed_style = ttk.Style()
-completed_style.configure("Completed.TCombobox", background="lightgreen")
-if remaining_courses:
-    dropdown_menu.set(remaining_courses[0])
 
 # 特徵勾選框
 feature_vars = {key: tk.BooleanVar() for key in keywords.keys()}
@@ -112,28 +111,32 @@ def update_features():
         return
 
     selected_features = [key for key, var in feature_vars.items() if var.get()]
+    if course in progress:
+        progress[course] = selected_features
+    else:
+        progress[course] = selected_features
 
     # 將選中的特徵應用到所有同名課程
     data.loc[data['科目名稱(連結課程地圖)             備註 \n             限選條件'] == course, selected_features] = True
 
-    # 標記課程已完成
-    completed_courses.add(course)
-
-    # 更新下拉選單樣式
-    dropdown_menu.configure(style="Completed.TCombobox")
-
-    # 清空勾選
-    for var in feature_vars.values():
-        var.set(False)
-
     messagebox.showinfo("成功", f"課程 '{course}' 已完成標記！")
+
+# 加載標註特徵
+def load_features(*args):
+    course = selected_course.get()
+    if course in progress:
+        for feature, var in feature_vars.items():
+            var.set(feature in progress[course])
+    else:
+        for var in feature_vars.values():
+            var.set(False)
 
 # 保存資料和進度的函數
 def save_data():
     output_file = 'enhanced_course_data.csv'
     data.to_csv(output_file, index=False)
     with open(progress_file, 'w') as f:
-        json.dump({'completed_courses': list(completed_courses)}, f)
+        json.dump(progress, f)
     messagebox.showinfo("成功", f"增強後的數據集已保存到: {output_file}，進度已保存！")
 
 # 按鈕
@@ -145,6 +148,9 @@ update_button.pack(side=tk.LEFT, padx=5)
 
 save_button = tk.Button(button_frame, text="保存進度", command=save_data)
 save_button.pack(side=tk.LEFT, padx=5)
+
+# 下拉選單事件
+selected_course.trace('w', load_features)
 
 # 啟動主循環
 root.mainloop()
