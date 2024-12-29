@@ -50,20 +50,33 @@ progress_file = 'progress.json'
 if os.path.exists(progress_file):
     with open(progress_file, 'r') as f:
         progress = json.load(f)
-        current_index = progress.get('current_index', 0)
+        completed_courses = set(progress.get('completed_courses', []))
 else:
-    current_index = 0
+    completed_courses = set()
 
 course_names = data['科目名稱(連結課程地圖)             備註 \n             限選條件'].drop_duplicates().tolist()
+remaining_courses = [course for course in course_names if course not in completed_courses]
 
 # 建立 GUI
 root = tk.Tk()
 root.title("課程特徵選擇器")
 root.geometry("700x500")
 
-# 顯示當前課程名稱
-course_label = tk.Label(root, text=f"當前課程名稱: {course_names[current_index]}", font=("Arial", 14))
-course_label.pack(pady=10)
+# 當前課程名稱
+selected_course = tk.StringVar()
+
+# 顯示下拉選單
+dropdown_label = tk.Label(root, text="選擇課程名稱:", font=("Arial", 12))
+dropdown_label.pack(pady=10)
+
+dropdown_menu = ttk.Combobox(root, textvariable=selected_course, values=course_names, state="readonly", width=50)
+dropdown_menu.pack(pady=10)
+
+# 標記已完成課程的樣式
+completed_style = ttk.Style()
+completed_style.configure("Completed.TCombobox", background="lightgreen")
+if remaining_courses:
+    dropdown_menu.set(remaining_courses[0])
 
 # 特徵勾選框
 feature_vars = {key: tk.BooleanVar() for key in keywords.keys()}
@@ -78,38 +91,41 @@ for i, feature in enumerate(keywords.keys()):
 
 # 更新特徵的函數
 def update_features():
-    global current_index
-    course = course_names[current_index]
+    course = selected_course.get()
+    if not course:
+        messagebox.showwarning("警告", "請選擇一門課程！")
+        return
+
     selected_features = [key for key, var in feature_vars.items() if var.get()]
 
     # 將選中的特徵應用到所有同名課程
     data.loc[data['科目名稱(連結課程地圖)             備註 \n             限選條件'] == course, selected_features] = True
 
+    # 標記課程已完成
+    completed_courses.add(course)
+
+    # 更新下拉選單樣式
+    dropdown_menu.configure(style="Completed.TCombobox")
+
     # 清空勾選
     for var in feature_vars.values():
         var.set(False)
 
-    # 前往下一個課程
-    current_index += 1
-    if current_index < len(course_names):
-        course_label.config(text=f"當前課程名稱: {course_names[current_index]}")
-    else:
-        messagebox.showinfo("完成", "所有課程特徵已標註完成！")
-        current_index = 0
+    messagebox.showinfo("成功", f"課程 '{course}' 已完成標記！")
 
 # 保存資料和進度的函數
 def save_data():
     output_file = 'enhanced_course_data.csv'
     data.to_csv(output_file, index=False)
     with open(progress_file, 'w') as f:
-        json.dump({'current_index': current_index}, f)
+        json.dump({'completed_courses': list(completed_courses)}, f)
     messagebox.showinfo("成功", f"增強後的數據集已保存到: {output_file}，進度已保存！")
 
 # 按鈕
 button_frame = tk.Frame(root)
 button_frame.pack(pady=10)
 
-update_button = tk.Button(button_frame, text="更新並跳至下一個", command=update_features)
+update_button = tk.Button(button_frame, text="更新並標記完成", command=update_features)
 update_button.pack(side=tk.LEFT, padx=5)
 
 save_button = tk.Button(button_frame, text="保存進度", command=save_data)
